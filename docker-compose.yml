@@ -1,0 +1,30 @@
+services:
+  app:
+    build: .
+    container_name: nuoche-app
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - /volume2/docker/nuoche/data:/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: nuoche-cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      app:
+        condition: service_healthy
+
+networks:
+  default:
+    name: nuoche_default
+    ipam:
+      config:
+        - subnet: 10.66.0.0/24

@@ -51,6 +51,34 @@ export interface VehicleSummary {
   qrUrl: string;
 }
 
+export interface OwnerSummary {
+  id: number;
+  role: UserRole;
+  name: string;
+  phone: string | null;
+  status: EntityStatus;
+}
+
+export interface OwnerInput {
+  name: string;
+  phone: string | null;
+  password: string;
+}
+
+export interface VehicleInput {
+  ownerId?: number;
+  plateNumber: string;
+  plateDisplay: string;
+  brandModel: string;
+  color: string;
+  parkingHint: string;
+  ownerPhone: string | null;
+  pushplusToken?: string | null;
+  allowPhoneCall: boolean;
+  allowWechatNotify: boolean;
+  status: EntityStatus;
+}
+
 export interface MoveRequestSummary {
   id: number;
   requestCode: string;

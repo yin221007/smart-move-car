@@ -5,6 +5,8 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    ports:
+      - "${HOST_PORT:-13004}:3000"
     volumes:
       - /volume2/docker/nuoche/data:/data
     healthcheck:
@@ -12,15 +14,6 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
-
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: nuoche-cloudflared
-    restart: unless-stopped
-    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
-    depends_on:
-      app:
-        condition: service_healthy
 
 networks:
   default:

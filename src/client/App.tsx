@@ -1,6 +1,17 @@
 import { useEffect, useState } from "react";
-import type { MoveRequestSummary, PublicVehicle, VehicleSummary } from "../shared/types";
-import { fetchMoveRequests, fetchPublicVehicle, fetchVehicles, notifyOwner } from "./api";
+import type { DashboardUser, MoveRequestSummary, OwnerInput, OwnerSummary, PublicVehicle, VehicleInput, VehicleSummary } from "../shared/types";
+import {
+  createOwner,
+  createVehicle,
+  deleteVehicle,
+  fetchCurrentUser,
+  fetchMoveRequests,
+  fetchOwners,
+  fetchPublicVehicle,
+  fetchVehicles,
+  notifyOwner,
+  updateVehicle
+} from "./api";
 import { DashboardPageView } from "./pages/DashboardPage";
 import { LoginPage } from "./pages/LoginPage";
 import { OwnerReplyPage, ScanPageView } from "./pages/ScanPage";
@@ -8,12 +19,29 @@ import { OwnerReplyPage, ScanPageView } from "./pages/ScanPage";
 export function App() {
   const [vehicle, setVehicle] = useState<PublicVehicle | null>(null);
   const [vehicleError, setVehicleError] = useState("");
+  const [dashboardUser, setDashboardUser] = useState<DashboardUser | null>(null);
+  const [dashboardError, setDashboardError] = useState("");
+  const [owners, setOwners] = useState<OwnerSummary[]>([]);
   const [vehicles, setVehicles] = useState<VehicleSummary[]>([]);
   const [requests, setRequests] = useState<MoveRequestSummary[]>([]);
   const path = window.location.pathname;
   const scanMatch = path.match(/^\/c\/([^/]+)$/);
   const replyMatch = path.match(/^\/r\/([^/]+)$/);
   const scanCode = scanMatch?.[1];
+
+  async function loadDashboard() {
+    setDashboardError("");
+    const nextUser = await fetchCurrentUser();
+    const [nextVehicles, nextRequests] = await Promise.all([fetchVehicles(), fetchMoveRequests()]);
+    setDashboardUser(nextUser);
+    setVehicles(nextVehicles);
+    setRequests(nextRequests);
+    if (nextUser.role === "admin") {
+      setOwners(await fetchOwners());
+    } else {
+      setOwners([]);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -32,9 +60,13 @@ export function App() {
       };
     }
     if (path.startsWith("/dashboard")) {
-      void Promise.all([fetchVehicles(), fetchMoveRequests()]).then(([nextVehicles, nextRequests]) => {
-        setVehicles(nextVehicles);
-        setRequests(nextRequests);
+      void loadDashboard().catch((error) => {
+        if (cancelled) return;
+        if (error instanceof Error && error.message === "未登录") {
+          window.location.href = "/login";
+          return;
+        }
+        setDashboardError(error instanceof Error ? error.message : "后台读取失败");
       });
     }
     return () => {
@@ -49,5 +81,31 @@ export function App() {
   }
   if (replyMatch) return <OwnerReplyPage replyToken={replyMatch[1]} />;
   if (path.startsWith("/login")) return <LoginPage />;
-  return <DashboardPageView user={{ id: 0, role: "owner", name: "车主", phone: null }} vehicles={vehicles} requests={requests} />;
+  if (dashboardError) return <main className="page-state">{dashboardError}</main>;
+  if (!dashboardUser) return <main className="page-state">正在读取后台</main>;
+  return (
+    <DashboardPageView
+      user={dashboardUser}
+      owners={owners}
+      vehicles={vehicles}
+      requests={requests}
+      onCreateOwner={async (payload: OwnerInput) => {
+        await createOwner(payload);
+        await loadDashboard();
+      }}
+      onCreateVehicle={async (payload: VehicleInput) => {
+        await createVehicle(payload);
+        await loadDashboard();
+      }}
+      onUpdateVehicle={async (id: number, payload: VehicleInput) => {
+        await updateVehicle(id, payload);
+        await loadDashboard();
+      }}
+      onDeleteVehicle={async (id: number) => {
+        await deleteVehicle(id);
+        await loadDashboard();
+      }}
+      onRefresh={loadDashboard}
+    />
+  );
 }
